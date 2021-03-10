@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "errqueue.h": "c",
-        "ip.h": "c"
+        "ip.h": "c",
+        "netdb.h": "c"
     }
 }

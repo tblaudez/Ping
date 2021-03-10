@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:43 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/10 14:37:46 by anonymous     ########   odam.nl         */
+/*   Updated: 2021/03/10 18:02:18 by anonymous     ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,7 @@
 # include <sys/time.h>
 # include <sys/socket.h>
 
-# define PACKET_SIZE 84
+# define PACKET_SIZE 56
 
 
 struct s_send
@@ -47,9 +47,8 @@ struct s_ping
 	struct sockaddr_in	host;
 	char				host_ip[INET_ADDRSTRLEN];
 	unsigned char		flags;
-	int					ttl, interval, deadline, timeout, sockfd;
-	unsigned int		ntransmitted;
-	unsigned int		nreceived;
+	int					sockfd, ttl;
+	unsigned int		npackets, ntransmitted, nreceived, nlimit, nerror;
 };
 
 extern struct s_ping	g_ping;

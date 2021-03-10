@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:29 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/10 16:26:25 by anonymous     ########   odam.nl         */
+/*   Updated: 2021/03/10 18:08:37 by anonymous     ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@
 
 struct s_ping g_ping = {0};
 
-u_short in_cksum(void *addr, int size)
+unsigned short in_cksum(void *addr, int size)
 {
 	register uint32_t sum;
 	uint16_t *buff;
@@ -55,6 +55,8 @@ void usage(void)
 
 void setup_socket(void)
 {
+	g_ping.ttl = 113;
+
 	if ((g_ping.sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) == -1) {
 		perror("socket");
 		exit_clean(EXIT_FAILURE);
@@ -90,7 +92,7 @@ void setup_host(const char *hostname)
 	freeaddrinfo(res);
 }
 
-void setup_send(void)
+void setup_send(struct timeval *tv_start)
 {
 	bzero(&g_ping.send, sizeof(struct s_send));
 	
@@ -98,6 +100,8 @@ void setup_send(void)
 	g_ping.send.icmp.un.echo.id = getpid();
 	g_ping.send.icmp.un.echo.sequence = g_ping.ntransmitted + 1;
 	g_ping.send.icmp.checksum = in_cksum(&g_ping.send.icmp, sizeof(struct icmphdr));
+
+	// memcpy(&g_ping.send.data, tv_start, sizeof(struct timeval));
 }
 
 void setup_receive(void)
@@ -114,41 +118,72 @@ void setup_receive(void)
 	g_ping.receive.msg.msg_controllen = sizeof(g_ping.receive.control);
 }
 
+void send_echo_request(struct timeval *tv_start)
+{
+	ssize_t	size;
+	
+	setup_send(tv_start);
+	size = sendto(g_ping.sockfd, &g_ping.send, sizeof(g_ping.send), 0, (struct sockaddr*)&g_ping.host, sizeof(g_ping.host));
+	if (size == -1) {
+		fprintf(stderr, "ft_ping: sendto: could not send packet\n");
+		g_ping.nerror++;
+	} else {
+		g_ping.ntransmitted++;
+	}
+}
+
+static inline double get_time_difference(struct timeval *start, struct timeval *end)
+{
+	return (double)((end->tv_sec * 1000 + end->tv_usec) - (start->tv_sec * 1000 + start->tv_usec)) / 1000;
+}
+
+void receive_echo_reply(struct timeval *tv_start)
+{
+	ssize_t size;
+	struct timeval tv_end;
+
+	setup_receive();
+	size = recvmsg(g_ping.sockfd, &g_ping.receive.msg, 0);
+	gettimeofday(&tv_end, NULL);
+	if (size == -1 && errno == EAGAIN) {
+		fprintf(stderr, "ft_ping: request timed out for icmp_seq=%hu\n", g_ping.npackets);
+		g_ping.nerror++;
+	} else {
+		fprintf(stdout, "%lu bytes from %s: icmp_seq=%d ttl=%d time=%.2f ms\n", size, g_ping.host_ip, g_ping.npackets, g_ping.ttl, get_time_difference(tv_start, &tv_end));
+		g_ping.nreceived++;
+	}
+}
+
+void ping_loop(char *const hostname)
+{
+	struct timeval tv_start;
+
+	printf("PING %s (%s) %lu(%lu) data bytes\n", hostname, g_ping.host_ip, sizeof(g_ping.send.data), sizeof(g_ping.send));
+	while (g_ping.nlimit == 0 || (g_ping.npackets < g_ping.nlimit))
+	{
+		gettimeofday(&tv_start, NULL);
+		g_ping.npackets++;
+		send_echo_request(&tv_start);
+		receive_echo_reply(&tv_start);
+		sleep(1);
+	}
+}
+
 int main(int argc, char *argv[])
 {
-	char			*hostname = argv[1];
-	ssize_t			size;
+	char			*hostname = argv[1]; // TODO: replace
 
+	if (argc < 2) {
+		usage();
+	}
 	if (getuid() != 0) {
 		fprintf(stderr, "ft_ping: Operation Not Permitted\n");
 		return 1;
 	}
-	
-	g_ping.ttl = 255;
+
 	setup_socket();
 	setup_host(hostname);
+	ping_loop(hostname);
 
-	while (1)
-	{
-		setup_send();
-		size = sendto(g_ping.sockfd, &g_ping.send, sizeof(g_ping.send), 0, (struct sockaddr*)&g_ping.host, sizeof(g_ping.host));
-		if (size == -1) {
-			fprintf(stderr, "ft_ping: sendto: could not send packet\n");
-			exit_clean(EXIT_FAILURE);
-		} else {
-			g_ping.ntransmitted++;
-		}
-		
-		setup_receive();
-		size = recvmsg(g_ping.sockfd, &g_ping.receive.msg, 0);
-		if (size == -1 && errno == EAGAIN) {
-			fprintf(stderr, "ft_ping: request timed out for icmp_seq=%hu\n", g_ping.ntransmitted);
-		} else {
-			fprintf(stdout, "%lu bytes from %s: icmp_seq=%d ttl=%d time=%f ms\n", size, g_ping.host_ip, g_ping.receive.recv_icmp.un.echo.sequence, g_ping.ttl, 2.0);
-			g_ping.nreceived++;
-		}
-
-		sleep(1);
-	}
 	return 0;
 }

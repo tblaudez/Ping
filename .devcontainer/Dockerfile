@@ -1,10 +1,5 @@
-# See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.163.1/containers/debian/.devcontainer/base.Dockerfile
+FROM debian:7
 
-# [Choice] Debian version: buster, stretch
-ARG VARIANT="buster"
-FROM mcr.microsoft.com/vscode/devcontainers/base:0-${VARIANT}
+RUN apt-get update && apt-get -y install --no-install-recommends build-essential gdb
 
-# ** [Optional] Uncomment this section to install additional packages. **
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends build-essential gdb
-
+ENTRYPOINT SHELL /bin/bash
