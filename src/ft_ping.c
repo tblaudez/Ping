@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:29 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/15 12:14:25 by anonymous     ########   odam.nl         */
+/*   Updated: 2021/03/15 13:11:44 by anonymous     ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,12 +20,14 @@
 #include <string.h> // memset
 #include <arpa/inet.h> // inet_ntop
 
+/* Global ping variable */
 struct s_ping g_ping = {
 	.ttl = 113,
-	.datalen = 8 + DEFAULT_DATALEN,
+	.datalen = sizeof(struct icmphdr) + DEFAULT_DATALEN,
 	.sockfd = -1
 };
 
+/* Simple checksum function */
 unsigned short in_cksum(void *addr, int size)
 {
 	register uint32_t	sum;
@@ -41,6 +43,7 @@ unsigned short in_cksum(void *addr, int size)
 	return (~sum);
 }
 
+/* Close socket file descriptor and exit program */
 void exit_clean(int const status)
 {
 	if (g_ping.sockfd != -1)
@@ -48,17 +51,20 @@ void exit_clean(int const status)
 	exit(status);
 }
 
+/* Print program usage and exit */
 void usage(void)
 {
 	fprintf(stderr, "usage: ft_ping [-vh] destination\n");
 	exit_clean(EXIT_FAILURE);
 }
 
+/* Return the difference (in milliseconds) between two struct timeval */
 static inline double get_time_difference(struct timeval *start, struct timeval *end)
 {
 	return ((double)(end->tv_sec - start->tv_sec) * 1000) + ((double)(end->tv_usec - start->tv_usec) / 1000);
 }
 
+/* Create socket and set socket options */
 void setup_socket(void)
 {
 	// Create RAW socket
@@ -81,6 +87,7 @@ void setup_socket(void)
 	}
 }
 
+/* Find host and IP address */
 void setup_host(const char *hostname)
 {
 	struct addrinfo	*res, hints = {
@@ -106,6 +113,7 @@ void setup_host(const char *hostname)
 	freeaddrinfo(res);
 }
 
+/* Send ICMP ECHO_REQUEST to host */
 void send_echo_request()
 {
 	ssize_t			size;
@@ -143,6 +151,7 @@ void send_echo_request()
 		g_ping.ntransmitted++;
 }
 
+/* Wait for ICMP ECHO_REPLY from host */
 void receive_echo_reply()
 {
 	ssize_t			size;
@@ -181,6 +190,7 @@ void receive_echo_reply()
 	}
 }
 
+/* Main loop of the program */
 void ping_loop(char *const hostname)
 {
 	printf("PING %s (%s) %d(%d) data bytes\n", hostname, g_ping.host_ip, g_ping.datalen - 8, g_ping.datalen);
