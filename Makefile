@@ -22,15 +22,15 @@ NAME := ft_ping
 SRC := $(addprefix src/, ping.c utils.c)
 INC := $(addprefix include/, ft_ping.h)
 OBJ := $(SRC:%.c=%.o)
- # TODO: Remove debug flags
-CFLAGS := -I include/ -Wall -Wextra -g3 #-Werror -std=c99 -pedantic
+CFLAGS := -I include/ -Wall -Wextra -Werror -g3
+FLAGS := -lm
 
 all: $(NAME)
 	@printf "$(PURPLE)Done$(RESET)\n"
 
 $(NAME): $(INC) $(OBJ)
 	@printf "\n$(GREEN)Compiling program $(UNDERLINED)%s$(RESET)\n" $(NAME)
-	@$(CC) $(CFLAGS) $(OBJ) $(LIB) -o $(NAME)
+	@$(CC) $(CFLAGS) $(FLAGS) $(OBJ) $(LIB) -o $(NAME)
 
 %.o: %.c
 	@printf "$(YELLOW)Compiling source file %-50s$(RESET)\r" $<
