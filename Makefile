@@ -6,7 +6,7 @@
 #    By: tblaudez <tblaudez@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
 #    Created: 2021/02/09 14:37:19 by tblaudez      #+#    #+#                  #
-#    Updated: 2021/03/15 14:11:23 by tblaudez      ########   odam.nl          #
+#    Updated: 2021/03/18 13:05:26 by tblaudez      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
@@ -22,7 +22,7 @@ NAME := ft_ping
 SRC := $(addprefix src/, ping.c utils.c)
 INC := $(addprefix include/, ft_ping.h)
 OBJ := $(SRC:%.c=%.o)
-CFLAGS := -I include/ -Wall -Wextra -Werror -g3
+CFLAGS := -I include/ -Wall -Wextra -Werror
 FLAGS := -lm
 
 all: $(NAME)
