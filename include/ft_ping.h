@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:43 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/17 18:24:17 by tblaudez      ########   odam.nl         */
+/*   Updated: 2021/03/18 10:40:44 by tblaudez      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@
 # define RTT 0x01
 # define TIMEOUT 0x02
 # define DEADLINE 0x04
+# define VERBOSE 0x08
 
 struct s_host {
 	struct sockaddr		addr;
@@ -58,6 +59,7 @@ uint16_t	in_cksum(void *addr, int size);
 void		close_socket(void);
 void		usage(void);
 void		signal_handler(int signo);
+void		pr_icmph(uint8_t type, uint8_t code, uint32_t info, struct icmphdr *icp);
 
 // ping.c
 void		finish();

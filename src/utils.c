@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/03/15 14:03:05 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/15 14:12:07 by tblaudez      ########   odam.nl         */
+/*   Updated: 2021/03/18 10:40:15 by tblaudez      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -103,7 +103,7 @@ void close_socket(void)
 /* Print program usage and exit */
 void usage(void)
 {
-	fprintf(stderr, "usage: ft_ping [-vh] destination\n");
+	fprintf(stderr, "usage: ft_ping\t[-vh] [-c count] [-i interval]\n\t\t[-t ttl] [-w deadline] [-W timeout]\n\t\t[-s packetsize] destination\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -142,4 +142,96 @@ void update_round_trip_time(long triptime)
 		g_ping.tmin = triptime;
 	if (triptime > g_ping.tmax)
 		g_ping.tmax = triptime;
+}
+
+void pr_icmph(uint8_t type, uint8_t code, uint32_t info, struct icmphdr *icp)
+{
+	switch(type) {
+	case ICMP_ECHOREPLY:
+		printf("Echo Reply\n");
+		break;
+	case ICMP_DEST_UNREACH:
+		switch(code) {
+		case ICMP_NET_UNREACH:
+			printf("Destination Net Unreachable\n");
+			break;
+		case ICMP_HOST_UNREACH:
+			printf("Destination Host Unreachable\n");
+			break;
+		case ICMP_PROT_UNREACH:
+			printf("Destination Protocol Unreachable\n");
+			break;
+		case ICMP_PORT_UNREACH:
+			printf("Destination Port Unreachable\n");
+			break;
+		case ICMP_FRAG_NEEDED:
+			printf("Frag needed and DF set (mtu = %u)\n", info);
+			break;
+		case ICMP_SR_FAILED:
+			printf("Source Route Failed\n");
+			break;
+		case ICMP_PKT_FILTERED:
+			printf("Packet filtered\n");
+			break;
+		default:
+			printf("Dest Unreachable, Bad Code: %d\n", code);
+			break;
+		}
+		break;
+	case ICMP_SOURCE_QUENCH:
+		printf("Source Quench\n");
+		break;
+	case ICMP_REDIRECT:
+		switch(code) {
+		case ICMP_REDIR_NET:
+			printf("Redirect Network");
+			break;
+		case ICMP_REDIR_HOST:
+			printf("Redirect Host");
+			break;
+		case ICMP_REDIR_NETTOS:
+			printf("Redirect Type of Service and Network");
+			break;
+		case ICMP_REDIR_HOSTTOS:
+			printf("Redirect Type of Service and Host");
+			break;
+		default:
+			printf("Redirect, Bad Code: %d", code);
+			break;
+		}
+		break;
+	case ICMP_ECHO:
+		printf("Echo Request\n");
+		break;
+	case ICMP_TIME_EXCEEDED:
+		switch(code) {
+		case ICMP_EXC_TTL:
+			printf("Time to live exceeded\n");
+			break;
+		case ICMP_EXC_FRAGTIME:
+			printf("Frag reassembly time exceeded\n");
+			break;
+		default:
+			printf("Time exceeded, Bad Code: %d\n", code);
+			break;
+		}
+		break;
+	case ICMP_PARAMETERPROB:
+		printf("Parameter problem: pointer = %u\n", icp ? (ntohl(icp->un.gateway)>>24) : info);
+		break;
+	case ICMP_TIMESTAMP:
+		printf("Timestamp\n");
+		break;
+	case ICMP_TIMESTAMPREPLY:
+		printf("Timestamp Reply\n");
+		break;
+	case ICMP_INFO_REQUEST:
+		printf("Information Request\n");
+		break;
+	case ICMP_INFO_REPLY:
+		printf("Information Reply\n");
+		break;
+	default:
+		printf("Bad ICMP type: %d\n", type);
+	}
 }

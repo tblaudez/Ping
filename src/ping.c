@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:29 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/15 15:33:20 by tblaudez      ########   odam.nl         */
+/*   Updated: 2021/03/18 11:50:52 by tblaudez      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,6 +22,7 @@
 #include <limits.h> // LONG_MAX
 #include <signal.h> // signal, SIGINT
 #include <math.h> // sqrtl
+#include <arpa/inet.h> // inet_ntop
 
 /* Global ping variable */
 struct s_ping g_ping = {
@@ -29,6 +30,7 @@ struct s_ping g_ping = {
 	.datalen = ICMPHDR + DEFAULT_DATALEN,
 	.sockfd = -1,
 	.interval = 1,
+	.timeout = 1,
 	.count = 0,
 	.flags = RTT,
 	.tmin = LONG_MAX
@@ -50,12 +52,10 @@ void setup_socket(void)
 	}
 
 	// Set socket receive timeout
-	if (g_ping.flags & TIMEOUT) {
-		struct timeval timeout = { .tv_sec = g_ping.timeout };
-		if (setsockopt(g_ping.sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-			perror("ft_ping: can't set timeout socket option");
-			exit(EXIT_FAILURE);
-		}
+	struct timeval timeout = { .tv_sec = g_ping.timeout };
+	if (setsockopt(g_ping.sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+		perror("ft_ping: can't set timeout socket option");
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -70,7 +70,7 @@ void setup_host()
 	
 	// Get host by name
 	if (getaddrinfo(g_ping.host_arg, NULL, &hints, &res)) {
-		fprintf(stderr, "ft_ping: getaddrinfo: could not resolve \"%s\"\n", g_ping.host_arg);
+		fprintf(stderr, "ft_ping: %s: Name or service not known\n", g_ping.host_arg);
 		exit(EXIT_FAILURE);
 	}
 
@@ -92,8 +92,8 @@ void finish()
 	printf("--- %s ping statistics ---\n", g_ping.host_arg);
 	printf("%ld packet transmitted, ", g_ping.ntransmitted);
 	printf("%ld received", g_ping.nreceived);
-	if (g_ping.nreceived > 0) {
-		int loss = ((g_ping.ntransmitted - g_ping.nreceived) * 100) / g_ping.ntransmitted;
+	if (g_ping.ntransmitted > 0) {
+		int loss = g_ping.nreceived == 0 ? 100 : ((g_ping.ntransmitted - g_ping.nreceived) * 100) / g_ping.ntransmitted;
 		printf(", %d%% packet loss", loss);
 	}
 	putchar('\n');
@@ -155,58 +155,64 @@ void send_echo_request()
 }
 
 /* Wait for ICMP ECHO_REPLY from host */
-void receive_echo_reply()
+bool receive_echo_reply()
 {
-	char recvbuf[256];
-	char controlbuf[1024];
-	struct timeval tv_end;
-	long triptime;
+	char recvbuf[128];
 	struct iovec iov = {
 		.iov_base = recvbuf,
 		.iov_len = sizeof(recvbuf)
 	};
+	struct s_host target = {.addrlen = sizeof(target.addr)};
 	struct msghdr msg = {
+		.msg_name = (void*)&target.addr,
+		.msg_namelen = target.addrlen,
 		.msg_iov = &iov,
 		.msg_iovlen = 1,
-		.msg_control = controlbuf,
-		.msg_controllen = sizeof(controlbuf)
 	};
-
-
-	// Wait for message in socket
-	ssize_t size = recvmsg(g_ping.sockfd, &msg, 0);
-
-	// If socket timeout-ed
-	if (size == -1 && errno == EAGAIN) {
-		fprintf(stderr, "ft_ping: request timed out for icmp_seq=%ld\n", g_ping.npacket);
-		return;
-	}
-
 	struct iphdr *ip = (struct iphdr *) recvbuf;
 	struct icmphdr *icmp = (struct icmphdr *) (recvbuf + IPHDR);
-
-	if (icmp->type == ICMP_TIME_EXCEEDED) {
-		if (icmp->code == ICMP_EXC_TTL)
-			fprintf(stderr, "From %s (%s) icmp_seq=%ld Time to live exceeded\n", g_ping.host.name, g_ping.host.ip, g_ping.npacket);
-		return;
+	int msg_flags = 0;
+	ssize_t size;
+	
+	for (;;) {
+		// Wait for message in socket
+		size = recvmsg(g_ping.sockfd, &msg, msg_flags);
+		msg_flags = MSG_DONTWAIT;
+		
+		if (size < 0 && (errno == EAGAIN || errno == EINTR)) {
+			if (g_ping.flags & VERBOSE)
+				fprintf(stderr, "Timeout for icmp_seq=%ld\n", g_ping.npacket);
+			return false; // Packet has timeout-ed, send new one immediatly
+		}
+		
+		getnameinfo(&target.addr, target.addrlen, target.name, sizeof(target.name), NULL, 0, 0);
+		getnameinfo(&target.addr, target.addrlen, target.ip, sizeof(target.ip), NULL, 0, NI_NUMERICHOST);
+		
+		if (icmp->type == ICMP_ECHOREPLY)
+			break;
+		else if (g_ping.flags & VERBOSE) {
+			printf("From %s (%s) ", target.name, target.ip);
+			pr_icmph(icmp->type, icmp->code, icmp->un.gateway, icmp);
+		}
 	}
 	
-	printf("%lu bytes from %s (%s): icmp_seq=%d ttl=%d", size - IPHDR, g_ping.host.name, g_ping.host.ip, ntohs(icmp->un.echo.sequence), ip->ttl);
-	
+	printf("%lu bytes from %s (%s): icmp_seq=%u ttl=%d", size - IPHDR, target.name, target.ip, ntohs(icmp->un.echo.sequence), ip->ttl);
 	// If RTT is set, get send and receive timestamps	
 	if (g_ping.flags & RTT) {
+		struct timeval tv_end;
 		gettimeofday(&tv_end, NULL);
 		tvsub(&tv_end, (struct timeval *) (recvbuf + IPHDR + ICMPHDR));
-		triptime = tv_end.tv_sec * 1000000 + tv_end.tv_usec;
+		long triptime = tv_end.tv_sec * 1000000 + tv_end.tv_usec;
 		update_round_trip_time(triptime);
-
 		printf(" time=%ld.%03ld ms", triptime / 1000, triptime % 1000);
 	}
 	
 	putchar('\n');
 	g_ping.nreceived++;
+	return true;
 }
 
+/* Handle time to wait between two pings and ping deadline */
 static void wait_for_next(struct timeval *program_start)
 {
 	struct timeval wait_start, now, now2;
@@ -238,9 +244,8 @@ void ping_loop()
 	for (g_ping.npacket = 1; g_ping.count == 0 || g_ping.npacket <= g_ping.count; g_ping.npacket++)
 	{
 		send_echo_request();
-		receive_echo_reply();
-
-		wait_for_next(&program_start);
+		if (receive_echo_reply())
+			wait_for_next(&program_start);
 	}
 	finish();
 }
@@ -250,7 +255,7 @@ void parse_arguments(int argc, char* argv[])
 {
 	int	ch;
 
-	while ((ch = getopt(argc, argv, "c:s:i:t:W:w:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:s:i:t:W:w:vh")) != -1) {
 		switch (ch) {
 			
 			// Count limit
@@ -310,8 +315,12 @@ void parse_arguments(int argc, char* argv[])
 					exit(EXIT_FAILURE);
 				}
 				break;
+			
+			case 'v':
+				g_ping.flags |= VERBOSE;
+				break;
 
-			// Default	
+			case 'h':
 			default:
 				usage();
 		}
@@ -328,27 +337,22 @@ void parse_arguments(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	// Setup closing socket at exit
-	atexit(&close_socket);
-
-	// Setup signal handler
-	signal(SIGINT, &signal_handler);
-
-	// Parse arguments and get hostname
-	parse_arguments(argc, argv);
-
 	// If user is not root, exit
 	if (getuid() != 0) {
 		fprintf(stderr, "ft_ping: Operation Not Permitted\n");
 		return 1;
 	}
-
+	
+	// Setup closing socket at exit
+	atexit(&close_socket);
+	// Setup signal handler
+	signal(SIGINT, &signal_handler);
+	// Parse arguments and get hostname
+	parse_arguments(argc, argv);
 	// Create socket and set socket options
 	setup_socket();
-	
 	// Find host and IP
 	setup_host();
-
 	// Main loop
 	ping_loop();
 
