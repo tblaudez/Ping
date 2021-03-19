@@ -6,7 +6,7 @@
 #    By: tblaudez <tblaudez@student.codam.nl>         +#+                      #
 #                                                    +#+                       #
 #    Created: 2021/02/09 14:37:19 by tblaudez      #+#    #+#                  #
-#    Updated: 2021/03/18 13:05:26 by tblaudez      ########   odam.nl          #
+#    Updated: 2021/03/19 14:23:51 by tblaudez      ########   odam.nl          #
 #                                                                              #
 # **************************************************************************** #
 
@@ -19,10 +19,10 @@ RESET := \e[0m
 
 NAME := ft_ping
 
-SRC := $(addprefix src/, ping.c utils.c)
+SRC := $(addprefix src/, libft_functions.c ping.c receive.c send.c setup.c utils.c)
 INC := $(addprefix include/, ft_ping.h)
 OBJ := $(SRC:%.c=%.o)
-CFLAGS := -I include/ -Wall -Wextra -Werror
+CFLAGS := -I include/ -Wall -Wextra -Werror -Ofast
 FLAGS := -lm
 
 all: $(NAME)
