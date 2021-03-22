@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/03/15 14:03:05 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/19 14:08:45 by tblaudez      ########   odam.nl         */
+/*   Updated: 2021/03/22 10:37:58 by tblaudez      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,8 +44,15 @@ void close_socket(void)
 /* Handles program's signals */
 void signal_handler(int signo)
 {
-	if (signo == SIGINT)
-		finish();
+	switch (signo) {
+		case SIGINT:
+		case SIGALRM:
+			finish();
+			break;
+		
+		default:
+			break;
+	}
 }
 
 /* Subtract two struct timeval and copy result in the first argument */

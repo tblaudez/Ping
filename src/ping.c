@@ -6,7 +6,7 @@
 /*   By: tblaudez <tblaudez@student.codam.nl>         +#+                     */
 /*                                                   +#+                      */
 /*   Created: 2021/02/09 14:35:29 by tblaudez      #+#    #+#                 */
-/*   Updated: 2021/03/19 14:08:15 by tblaudez      ########   odam.nl         */
+/*   Updated: 2021/03/22 10:38:46 by tblaudez      ########   odam.nl         */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,23 +68,15 @@ void finish()
 }
 
 /* Handle time to wait between two pings and ping deadline */
-static void wait_for_next(struct timeval *program_start)
+static void wait_for_next()
 {
-	struct timeval wait_start, now, now2;
+	struct timeval wait_start, now;
 	
 	gettimeofday(&wait_start, NULL);
 	while (true) {
 		gettimeofday(&now, NULL);
-		ft_memcpy(&now2, &now, sizeof(now));
-		
-		if (g_ping.flags & DEADLINE) {
-			tvsub(&now, program_start);
-			if ((now.tv_sec + now.tv_usec / 1000000) >= g_ping.deadline)
-				finish();
-		}
-
-		tvsub(&now2, &wait_start);
-		if (now2.tv_sec + now2.tv_usec / 1000000 >= g_ping.interval)
+		tvsub(&now, &wait_start);
+		if (now.tv_sec + now.tv_usec / 1000000 >= g_ping.interval)
 			return;
 	}
 }
@@ -92,15 +84,12 @@ static void wait_for_next(struct timeval *program_start)
 /* Main loop of the program */
 static void ping_loop()
 {
-	struct timeval program_start;
-
-	gettimeofday(&program_start, NULL);
 	printf("PING %s (%s) %ld(%ld) data bytes\n", g_ping.host_name, g_ping.host_ip, g_ping.datalen - ICMPHDR, g_ping.datalen + IPHDR);
 	for (g_ping.npacket = 1; g_ping.count == 0 || g_ping.npacket <= g_ping.count; g_ping.npacket++)
 	{
 		send_echo_request();
 		if (receive_echo_reply())
-			wait_for_next(&program_start);
+			wait_for_next();
 	}
 	finish();
 }
@@ -203,6 +192,7 @@ int main(int argc, char* argv[])
 	
 	// Setup signal handler
 	signal(SIGINT, &signal_handler);
+	signal(SIGALRM, &signal_handler);
 	
 	// Parse arguments and get hostname
 	parse_arguments(argc, argv);
@@ -212,6 +202,10 @@ int main(int argc, char* argv[])
 	
 	// Find host and IP
 	setup_host();
+
+	// If deadline is set, send SIGALRM in `deadline` seconds
+	if (g_ping.flags & DEADLINE)
+		alarm(g_ping.deadline);
 	
 	// Main loop
 	ping_loop();
